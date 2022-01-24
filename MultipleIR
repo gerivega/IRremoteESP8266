@@ -1,0 +1,5 @@
+Modified programs to allow multiple IR sensors on different GPIOs
+
+based on the request from https://github.com/gerivega/Arduino-IRremote/issues/1
+
+Still on the testing phase
