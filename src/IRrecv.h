@@ -1,3 +1,4 @@
+//Modified for multiple IR
 // Copyright 2009 Ken Shirriff
 // Copyright 2015 Mark Szabo
 // Copyright 2015 Sebastien Warin
@@ -77,6 +78,7 @@ typedef struct {
   uint16_t rawlen;   // counter of entries in rawbuf.
   uint8_t overflow;  // Buffer overflow indicator.
   uint8_t timeout;   // Nr. of milliSeconds before we give up.
+  uint32_t start;    // MultiIR_Mod	
 } irparams_t;
 
 /// Results from a data match
@@ -113,6 +115,7 @@ class decode_results {
 /// Class for receiving IR messages.
 class IRrecv {
  public:
+  volatile irparams_t params; // MultiIR_Mod: the params instance  
 #if defined(ESP32)
   explicit IRrecv(const uint16_t recvpin, const uint16_t bufsize = kRawBuf,
                   const uint8_t timeout = kTimeoutMs,
@@ -590,13 +593,11 @@ class IRrecv {
                         const uint16_t nbits = kHaierAC176Bits,
                         const bool strict = true);
 #endif  // DECODE_HAIER_AC176
-#if (DECODE_HITACHI_AC || DECODE_HITACHI_AC2 || DECODE_HITACHI_AC264 || \
-     DECODE_HITACHI_AC344)
+#if (DECODE_HITACHI_AC || DECODE_HITACHI_AC2 || DECODE_HITACHI_AC344)
   bool decodeHitachiAC(decode_results *results, uint16_t offset = kStartOffset,
                        const uint16_t nbits = kHitachiAcBits,
                        const bool strict = true, const bool MSBfirst = true);
-#endif  // (DECODE_HITACHI_AC || DECODE_HITACHI_AC2 || DECODE_HITACHI_AC264 ||
-        //  DECODE_HITACHI_AC344)
+#endif
 #if DECODE_HITACHI_AC1
   bool decodeHitachiAC1(decode_results *results, uint16_t offset = kStartOffset,
                         const uint16_t nbits = kHitachiAc1Bits,

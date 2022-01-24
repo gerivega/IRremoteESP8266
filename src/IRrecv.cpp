@@ -1,3 +1,4 @@
+//Modified for multiple IR
 // Copyright 2009 Ken Shirriff
 // Copyright 2015 Mark Szabo
 // Copyright 2015 Sebastien Warin
@@ -144,14 +145,18 @@ namespace _IRrecv {  // Namespace extension
 #if defined(ESP32)
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 #endif  // ESP32
-volatile irparams_t params;
+// MultiIR_Mod: removed params def and adding global variable - list of params_struct to go thru in interruption cycle
+//volatile irparams_t params;
+#include "CppList.hpp"
+CppList lst_of_params;
+
 irparams_t *params_save;  // A copy of the interrupt state while decoding.
 }  // namespace _IRrecv
 
 #if defined(ESP32)
 using _IRrecv::mux;
 #endif  // ESP32
-using _IRrecv::params;
+//using _IRrecv::params; // MultiIR_Mod: moved to class
 using _IRrecv::params_save;
 
 #ifndef UNIT_TEST
@@ -171,7 +176,16 @@ static void USE_IRAM_ATTR read_timeout(void) {
 /// @endcond
   portENTER_CRITICAL(&mux);
 #endif  // ESP32
-  if (params.rawlen) params.rcvstate = kStopState;
+  //* MultiIR_Mod
+  //if (params.rawlen) params.rcvstate = kStopState; MultiIR_Mod
+  int count_of_params = _IRrecv::lst_of_params.GetCount();
+  for (int i=0;i<count_of_params;++i){
+	  volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(i);
+	  if (params->rawlen) params->rcvstate = kStopState; 
+  }
+  // MultiIR_Mod */
+  
+  
 #if defined(ESP8266)
   os_intr_unlock();
 #endif  // ESP8266
@@ -180,10 +194,12 @@ static void USE_IRAM_ATTR read_timeout(void) {
 #endif  // ESP32
 }
 
+
 /// Interrupt handler for changes on the GPIO pin handling incoming IR messages.
-static void USE_IRAM_ATTR gpio_intr() {
+//static void USE_IRAM_ATTR gpio_intr() {  //MultiIR_Mod
+static void USE_IRAM_ATTR gpio_intr(volatile irparams_t &params){ //MultiIR_Mod	
   uint32_t now = micros();
-  static uint32_t start = 0;
+  // static uint32_t start = 0; MultiIR_Mod	placed to params.start
 
 #if defined(ESP8266)
   uint32_t gpio_status = GPIO_REG_READ(GPIO_STATUS_ADDRESS);
@@ -210,14 +226,14 @@ static void USE_IRAM_ATTR gpio_intr() {
     params.rcvstate = kMarkState;
     params.rawbuf[rawlen] = 1;
   } else {
-    if (now < start)
-      params.rawbuf[rawlen] = (UINT32_MAX - start + now) / kRawTick;
+    if (now < params.start)  // MultiIR_Mod params.start
+      params.rawbuf[rawlen] = (UINT32_MAX - params.start + now) / kRawTick;  // MultiIR_Mod params.start
     else
-      params.rawbuf[rawlen] = (now - start) / kRawTick;
+      params.rawbuf[rawlen] = (now - params.start) / kRawTick; // MultiIR_Mod params.start
   }
   params.rawlen++;
 
-  start = now;
+  params.start = now; // MultiIR_Mod params.start
 
 #if defined(ESP8266)
   os_timer_arm(&timer, params.timeout, ONCE);
@@ -248,6 +264,45 @@ static void USE_IRAM_ATTR gpio_intr() {
 #endif  // ESP32
 }
 #endif  // UNIT_TEST
+
+//* MultiIR_Mod
+static void USE_IRAM_ATTR gpio_intr0() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(0);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr1() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(1);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr2() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(2);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr3() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(3);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr4() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(4);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr5() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(5);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr6() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(6);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr7() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(7);
+   gpio_intr(*params);
+}
+static void USE_IRAM_ATTR gpio_intr8() {
+   volatile irparams_t *params = _IRrecv::lst_of_params.GetItem(8);
+   gpio_intr(*params);
+}
+// MultiIR_Mod */
 
 // Start of IRrecv class -------------------
 
@@ -318,6 +373,8 @@ IRrecv::IRrecv(const uint16_t recvpin, const uint16_t bufsize,
   _unknown_threshold = kUnknownThreshold;
 #endif  // DECODE_HASH
   _tolerance = kTolerance;
+  
+ _IRrecv::lst_of_params.Add(&params); // MultiIR_Mod: add our instance to global list
 }
 
 /// Class destructor
@@ -372,7 +429,44 @@ void IRrecv::enableIRIn(const bool pullup) {
                  NULL);
 #endif  // ESP8266
   // Attach Interrupt
-  attachInterrupt(params.recvpin, gpio_intr, CHANGE);
+  //attachInterrupt(params.recvpin, gpio_intr, CHANGE);   //MultiIR_Mod change to call gpio_intr
+  //* MultiIR_Mod  
+  _IRrecv::lst_of_params.Add(&params); // MultiIR_Mod: add our instance to global list
+  int paramIndex = _IRrecv::lst_of_params.GetIndex(&params);
+  params.start = 0;
+  switch (paramIndex) {
+    case 0:
+      attachInterrupt(params.recvpin, gpio_intr0, CHANGE);
+	  break;
+    case 1:
+      attachInterrupt(params.recvpin, gpio_intr1, CHANGE);
+	  break;
+    case 2:
+      attachInterrupt(params.recvpin, gpio_intr2, CHANGE);
+	  break;
+    case 3:
+      attachInterrupt(params.recvpin, gpio_intr3, CHANGE);
+	  break;
+    case 4:
+      attachInterrupt(params.recvpin, gpio_intr4, CHANGE);
+	  break;
+    case 5:
+      attachInterrupt(params.recvpin, gpio_intr5, CHANGE);
+	  break;
+    case 6:
+      attachInterrupt(params.recvpin, gpio_intr6, CHANGE);
+	  break;
+    case 7:
+      attachInterrupt(params.recvpin, gpio_intr7, CHANGE);
+	  break;
+    case 8:
+      attachInterrupt(params.recvpin, gpio_intr8, CHANGE);
+	  break;
+	default:
+	  //errror not enough gpio_intr
+	  break;
+  }
+  // MultiIR_Mod  */
 #endif  // UNIT_TEST
 }
 
@@ -830,12 +924,6 @@ bool IRrecv::decode(decode_results *results, irparams_t *save,
     if (decodeHitachiAC(results, offset, kHitachiAc344Bits, true, false))
       return true;
 #endif  // DECODE_HITACHI_AC344
-#if DECODE_HITACHI_AC264
-    // HitachiAC264 should be checked before HitachiAC
-    DPRINTLN("Attempting Hitachi AC264 decode");
-    if (decodeHitachiAC(results, offset, kHitachiAc264Bits, true, false))
-      return true;
-#endif  // DECODE_HITACHI_AC264
 #if DECODE_HITACHI_AC2
     // HitachiAC2 should be checked before HitachiAC
     DPRINTLN("Attempting Hitachi AC2 decode");
@@ -1172,8 +1260,8 @@ bool IRrecv::matchAtLeast(uint32_t measured, uint32_t desired,
   DPRINT(". Matching: ");
   DPRINT(measured);
   DPRINT(" >= ");
-  DPRINT(ticksLow(std::min(desired, (uint32_t)MS_TO_USEC(params.timeout)),
-                  tolerance, delta));
+  DPRINT(ticksLow(std::min(desired, MS_TO_USEC(params.timeout)), tolerance,
+                  delta));
   DPRINT(" [min(");
   DPRINT(ticksLow(desired, tolerance, delta));
   DPRINT(", ");
